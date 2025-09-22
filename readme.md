@@ -3,9 +3,12 @@
 This repository contains all files related to my Kaggle BigQuery AI Hackathon project.
 For background and context, please see the [Kaggle write-up](./KAGGLE_WRITEUP.md).
 
+**Take a look at the demo web app: (https://1nterfect0r.github.io/kaggle_biq_query.io/)**
+
 ---
 
-## Getting Started
+
+## Getting Started with your own app
 
 ### 1. Data
 
@@ -33,7 +36,7 @@ These files should be publicly available.
 
 * Deploy the website to connect with the API.
 * The site allows interactive exploration of clusters and their time trends.
-* See the `website/` directory for code and instructions.
+* See the `website/` directory relevant files
 
 ---
 
