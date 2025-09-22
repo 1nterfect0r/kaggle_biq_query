@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cluster Trends Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color: #f7f7f9;
+      color: #1f2933;
+    }
+    body {
+      margin: 0;
+      padding: 0 1.5rem 2rem;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #ffffff 0%, #f2f5f8 100%);
+    }
+    header {
+      padding: 2rem 0 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 2.5vw, 2.4rem);
+    }
+    main {
+      display: grid;
+      gap: 1.5rem;
+    }
+    section {
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 14px;
+      box-shadow: 0 10px 35px rgba(15, 23, 42, 0.08);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-width: 140px;
+    }
+    label {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #4a5568;
+    }
+    input[type="range"],
+    input[type="number"],
+    input[type="search"] {
+      accent-color: #2563eb;
+    }
+    input,
+    button,
+    select {
+      font: inherit;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      border-radius: 8px;
+      padding: 0.35rem 0.6rem;
+      background: rgba(255, 255, 255, 0.7);
+      transition: border 0.2s ease, box-shadow 0.2s ease;
+    }
+    input:focus,
+    button:focus,
+    select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+    }
+    button.secondary {
+      background: rgba(37, 99, 235, 0.1);
+      color: #1f2937;
+    }
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 360px;
+      max-height: 420px;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .other-breakdown {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 10px;
+      padding: 1rem;
+      display: grid;
+      gap: 0.75rem;
+    }
+    .breakdown-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .breakdown-header h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+    .breakdown-header .meta {
+      margin: 0;
+      text-align: right;
+    }
+    .pie-container {
+      position: relative;
+      width: 100%;
+      height: 260px;
+    }
+    .pie-container canvas {
+      height: 100%;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+    .kpi {
+      padding: 1rem;
+      border-radius: 10px;
+      background: rgba(99, 102, 241, 0.08);
+      display: grid;
+      gap: 0.2rem;
+    }
+    .kpi span:first-child {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+    }
+    .kpi strong {
+      font-size: 1.2rem;
+    }
+    .questions-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .question-card {
+      padding: 0.9rem;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(255, 255, 255, 0.6);
+    }
+    .question-card a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .search-results {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .search-card {
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 0.9rem;
+      background: rgba(255, 255, 255, 0.65);
+      display: grid;
+      gap: 0.45rem;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+    .preset-bar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    @media (min-width: 960px) {
+      main {
+        grid-template-columns: 2fr 1fr;
+      }
+      section.full {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cluster Trends & Search</h1>
+    <p>Monitor stacked monthly shares, inspect cluster details, and explore questions fast.</p>
+  </header>
+  <main>
+    <section class="full">
+      <div class="controls">
+        <div class="control-group">
+          <label for="yearStart">Year range</label>
+          <div class="preset-bar">
+            <button type="button" class="secondary" data-preset="12">12M</button>
+            <button type="button" class="secondary" data-preset="24">24M</button>
+            <button type="button" class="secondary" data-preset="2020">Since 2020</button>
+          </div>
+          <div class="range-inputs">
+            <input type="range" id="yearStart">
+            <input type="range" id="yearEnd">
+            <div><span id="yearStartLabel"></span> - <span id="yearEndLabel"></span></div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label for="topX">Top clusters</label>
+          <input type="number" id="topX" min="1" value="10">
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="trendChart"></canvas>
+      </div>
+      <div class="other-breakdown" id="otherBreakdown">
+        <div class="breakdown-header">
+          <h3>Other composition</h3>
+          <p class="meta" id="otherMeta"></p>
+        </div>
+        <div class="pie-container">
+          <canvas id="otherChart"></canvas>
+        </div>
+        <p class="meta" id="otherEmpty" hidden>No clusters aggregate into Other for this selection.</p>
+      </div>
+      <p class="meta" id="chartMeta"></p>
+    </section>
+    <section id="clusterDetail">
+      <div>
+        <h2 id="clusterTitle">Cluster detail</h2>
+        <p class="meta" id="clusterSubtitle">Select a cluster from the legend to see KPIs and questions.</p>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div>
+        <div class="questions-list" id="questionsList"></div>
+        <div class="controls" id="questionPager" hidden>
+          <button type="button" id="prevPage" class="secondary">Prev</button>
+          <span class="meta" id="pageInfo"></span>
+          <button type="button" id="nextPage" class="secondary">Next</button>
+        </div>
+      </div>
+    </section>
+    <section>
+      <div class="control-group">
+        <label for="searchBox">Search questions</label>
+        <input type="search" id="searchBox" placeholder="Search clusters, keywords, intents...">
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <script>
+    (() => {
+      const API_BASE = 'https://bigquery-competition-node-294682573887.europe-west1.run.app';
+      const elements = {
+        yearStart: document.getElementById('yearStart'),
+        yearEnd: document.getElementById('yearEnd'),
+        yearStartLabel: document.getElementById('yearStartLabel'),
+        yearEndLabel: document.getElementById('yearEndLabel'),
+        topX: document.getElementById('topX'),
+        chartMeta: document.getElementById('chartMeta'),
+        chartCanvas: document.getElementById('trendChart'),
+        otherBreakdown: document.getElementById('otherBreakdown'),
+        otherChart: document.getElementById('otherChart'),
+        otherMeta: document.getElementById('otherMeta'),
+        otherEmpty: document.getElementById('otherEmpty'),
+        clusterTitle: document.getElementById('clusterTitle'),
+        clusterSubtitle: document.getElementById('clusterSubtitle'),
+        kpiGrid: document.getElementById('kpiGrid'),
+        questionsList: document.getElementById('questionsList'),
+        questionPager: document.getElementById('questionPager'),
+        prevPage: document.getElementById('prevPage'),
+        nextPage: document.getElementById('nextPage'),
+        pageInfo: document.getElementById('pageInfo'),
+        searchBox: document.getElementById('searchBox'),
+        searchResults: document.getElementById('searchResults')
+      };
+      const state = {
+        yearMin: null,
+        yearMax: null,
+        startYear: null,
+        endYear: null,
+        topX: 10,
+        clusters: [],
+        clusterMap: new Map(),
+        series: {},
+        dates: [],
+        chart: null,
+        otherChart: null,
+        otherBreakdown: {items: [], sum: 0, avgShare: 0, coverage: 0},
+        seriesCache: new Map(),
+        loadToken: 0,
+        currentClusterId: null,
+        questionsCache: new Map(),
+        questionPage: 0,
+        pageSize: 5
+      };
+      const defaultLegendClick = Chart.defaults.plugins.legend.onClick;
+      let searchTimer = 0;
+
+      init();
+
+      async function init() {
+        bindControls();
+        try {
+          const [yearsPayload, clusters] = await Promise.all([
+            fetchJSON('/yearRange'),
+            fetchJSON('/cluster')
+          ]);
+          ingestYearRange(yearsPayload);
+          ingestClusters(clusters);
+          syncYearControls();
+          await loadSeries();
+        } catch (err) {
+          console.error(err);
+          elements.chartMeta.textContent = 'Failed to load initial data.';
+        }
+      }
+
+      function bindControls() {
+        elements.topX.addEventListener('change', () => {
+          const value = clampTopX(Number(elements.topX.value || state.topX));
+          if (value !== state.topX) {
+            state.topX = value;
+            elements.topX.value = value;
+            renderChart();
+          }
+        });
+        elements.yearStart.addEventListener('input', handleYearInput);
+        elements.yearEnd.addEventListener('input', handleYearInput);
+        document.querySelectorAll('.preset-bar button').forEach(btn => {
+          btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+        });
+        elements.prevPage.addEventListener('click', () => {
+          if (state.questionPage > 0) {
+            state.questionPage -= 1;
+            renderQuestionsPage(state.currentClusterId);
+          }
+        });
+        elements.nextPage.addEventListener('click', () => {
+          const questions = state.questionsCache.get(state.currentClusterId) || [];
+          if ((state.questionPage + 1) * state.pageSize < questions.length) {
+            state.questionPage += 1;
+            renderQuestionsPage(state.currentClusterId);
+          }
+        });
+        elements.searchBox.addEventListener('input', () => {
+          const q = elements.searchBox.value.trim();
+          clearTimeout(searchTimer);
+          if (q.length === 0) {
+            elements.searchResults.innerHTML = '';
+            return;
+          }
+          searchTimer = setTimeout(() => runSearch(q), 400);
+        });
+        renderOtherBreakdown();
+      }
+
+      async function runSearch(query) {
+        elements.searchResults.innerHTML = '<p class="meta">Searching...</p>';
+        try {
+          const items = await fetchJSON('/search?query=' + encodeURIComponent(query));
+          renderSearchResults(query, items);
+        } catch (err) {
+          console.error(err);
+          elements.searchResults.innerHTML = '<p class="meta">Search failed. Try again.</p>';
+        }
+      }
+
+      function renderSearchResults(query, items) {
+        if (!Array.isArray(items) || items.length === 0) {
+          elements.searchResults.innerHTML = '<p class="meta">No matches for "' + escapeHtml(query) + '".</p>';
+          return;
+        }
+        elements.searchResults.innerHTML = '';
+        items.forEach(item => {
+          const card = document.createElement('article');
+          card.className = 'search-card';
+          const summary = document.createElement('p');
+          summary.textContent = (item.question_summary || '').trim();
+          const link = document.createElement('a');
+          link.href = item.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'Open question';
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = 'Distance ' + formatDistance(item.distance) + ' | Centroid ' + item.CENTROID_ID + ' | ' + clusterLabel(item.CENTROID_ID);
+          const inspect = document.createElement('button');
+          inspect.type = 'button';
+          inspect.className = 'secondary';
+          inspect.textContent = 'Inspect cluster';
+          inspect.addEventListener('click', () => {
+            showClusterDetail(item.CENTROID_ID);
+            elements.clusterTitle.scrollIntoView({behavior: 'smooth', block: 'start'});
+          });
+          card.append(summary, meta, link, inspect);
+          elements.searchResults.append(card);
+        });
+      }
+
+      function ingestYearRange(payload) {
+        if (!Array.isArray(payload) || payload.length === 0) {
+          throw new Error('Missing year range');
+        }
+        const range = payload[0];
+        state.yearMin = Number(range.min_year);
+        state.yearMax = Number(range.max_year);
+        const defaultStart = Math.max(state.yearMax - 1, state.yearMin);
+        state.startYear = defaultStart;
+        state.endYear = state.yearMax;
+      }
+
+      function ingestClusters(clusters) {
+        state.clusters = Array.isArray(clusters) ? clusters : [];
+        state.clusterMap = new Map(state.clusters.map(item => [Number(item.CENTROID_ID), item]));
+      }
+
+      function syncYearControls() {
+        elements.yearStart.min = state.yearMin;
+        elements.yearStart.max = state.yearMax;
+        elements.yearEnd.min = state.yearMin;
+        elements.yearEnd.max = state.yearMax;
+        elements.yearStart.value = state.startYear;
+        elements.yearEnd.value = state.endYear;
+        updateYearLabels();
+      }
+
+      function updateYearLabels() {
+        elements.yearStartLabel.textContent = state.startYear;
+        elements.yearEndLabel.textContent = state.endYear;
+        elements.yearStart.max = state.endYear;
+        elements.yearEnd.min = state.startYear;
+      }
+
+      function handleYearInput() {
+        let start = Number(elements.yearStart.value);
+        let end = Number(elements.yearEnd.value);
+        if (start > end) {
+          if (this === elements.yearStart) {
+            end = start;
+            elements.yearEnd.value = end;
+          } else {
+            start = end;
+            elements.yearStart.value = start;
+          }
+        }
+        state.startYear = start;
+        state.endYear = end;
+        updateYearLabels();
+        loadSeries();
+      }
+
+      function applyPreset(presetValue) {
+        const preset = String(presetValue);
+        if (preset === '12') {
+          state.startYear = Math.max(state.yearMax - 1, state.yearMin);
+          state.endYear = state.yearMax;
+        } else if (preset === '24') {
+          state.startYear = Math.max(state.yearMax - 2, state.yearMin);
+          state.endYear = state.yearMax;
+        } else if (preset === '2020') {
+          state.startYear = Math.max(2020, state.yearMin);
+          state.endYear = state.yearMax;
+        }
+        syncYearControls();
+        loadSeries();
+      }
+
+      function clampTopX(value) {
+        if (!Number.isFinite(value) || value < 1) return 1;
+        const total = Object.keys(state.series).length || state.clusters.length || 1;
+        return Math.min(value, total);
+      }
+
+      async function loadSeries() {
+        if (state.startYear === null || state.endYear === null) return;
+        const key = state.startYear + '-' + state.endYear;
+        const token = ++state.loadToken;
+        elements.chartMeta.textContent = 'Loading monthly series...';
+        try {
+          if (!state.seriesCache.has(key)) {
+            const rows = await fetchJSON('/monthlyTimeSeries?year_begin=' + state.startYear + '&year_end=' + state.endYear);
+            state.seriesCache.set(key, prepareSeries(rows));
+          }
+          if (token !== state.loadToken) return;
+          const prepared = state.seriesCache.get(key);
+          state.series = prepared.series;
+          state.dates = prepared.dates;
+          renderChart();
+        } catch (err) {
+          if (token !== state.loadToken) return;
+          console.error(err);
+          elements.chartMeta.textContent = 'Failed to load monthly series.';
+        }
+      }
+
+      function prepareSeries(rows) {
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return {dates: [], series: {}};
+        }
+        const sorted = [...rows].sort((a, b) => {
+          const aKey = (Number(a.year) || 0) * 12 + (Number(a.month) || 0);
+          const bKey = (Number(b.year) || 0) * 12 + (Number(b.month) || 0);
+          return aKey - bKey;
+        });
+        const clusterIds = new Set();
+        sorted.forEach(row => {
+          Object.keys(row).forEach(key => {
+            if (key.startsWith('CID_')) {
+              const id = Number(key.split('_')[1]);
+              if (Number.isFinite(id)) clusterIds.add(id);
+            }
+          });
+        });
+        const ids = [...clusterIds].sort((a, b) => a - b);
+        const dates = sorted.map(row => new Date(Number(row.year), Number(row.month) - 1, 1));
+        const series = {};
+        ids.forEach(id => {
+          series[id] = dates.map((date, idx) => {
+            const row = sorted[idx];
+            const value = Number(row['CID_' + id]) || 0;
+            return {x: date, y: value};
+          });
+        });
+        return {dates, series};
+      }
+
+      function renderChart() {
+        if (!state.dates.length) {
+          if (state.chart) {
+            state.chart.data.datasets = [];
+            state.chart.update();
+          }
+          state.otherBreakdown = {items: [], sum: 0, avgShare: 0, coverage: 0};
+          renderOtherBreakdown();
+          elements.chartMeta.textContent = 'No monthly data in the selected range.';
+          return;
+        }
+        const build = buildDatasets();
+        if (!state.chart) {
+          state.chart = new Chart(elements.chartCanvas.getContext('2d'), {
+            type: 'line',
+            data: {datasets: build.datasets},
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: {mode: 'nearest', intersect: false},
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {usePointStyle: true, boxWidth: 10},
+                  onClick: (event, legendItem, legend) => {
+                    const dataset = legend.chart.data.datasets[legendItem.datasetIndex];
+                    const native = event && event.native ? event.native : {};
+                    const allowToggle = dataset && !dataset._centroidId ? true : (native.ctrlKey || native.metaKey);
+                    if (allowToggle) {
+                      defaultLegendClick(event, legendItem, legend);
+                    } else if (legend.chart.isDatasetVisible(legendItem.datasetIndex) === false) {
+                      legend.chart.show(legendItem.datasetIndex);
+                    }
+                    if (dataset && dataset._centroidId) {
+                      showClusterDetail(dataset._centroidId);
+                    }
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: context => {
+                      const value = context.raw && context.raw.y ? context.raw.y : context.parsed.y || 0;
+                      return context.dataset.label + ': ' + formatPercent(value);
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  type: 'time',
+                  time: {unit: 'month', tooltipFormat: 'MMM yyyy'},
+                  ticks: {maxRotation: 0, autoSkipPadding: 16}
+                },
+                y: {
+                  stacked: true,
+                  beginAtZero: true,
+                  ticks: {callback: value => formatPercent(value)},
+                  title: {display: true, text: 'Share of questions'}
+                }
+              }
+            }
+          });
+        } else {
+          state.chart.data.datasets = build.datasets;
+          state.chart.update();
+        }
+        elements.chartMeta.textContent = build.meta;
+        renderOtherBreakdown();
+        if (state.currentClusterId) {
+          showClusterDetail(state.currentClusterId);
+        }
+      }
+
+      function buildDatasets() {
+        const totals = Object.entries(state.series).map(([id, points]) => {
+          const sum = points.reduce((acc, point) => acc + point.y, 0);
+          return {id: Number(id), sum};
+        }).sort((a, b) => b.sum - a.sum);
+        const topIds = totals.slice(0, state.topX).map(entry => entry.id);
+        if (topIds.length === 0 && totals.length > 0) topIds.push(totals[0].id);
+        const topSet = new Set(topIds);
+        const datasets = [];
+        topIds.forEach(id => {
+          const color = lineColor(id);
+          datasets.push({
+            label: clusterLabel(id),
+            data: state.series[id],
+            fill: true,
+            borderWidth: 2,
+            tension: 0.25,
+            borderColor: color.stroke,
+            backgroundColor: color.fill,
+            stack: 'shares',
+            _centroidId: id
+          });
+        });
+        const otherCandidates = totals.filter(entry => !topSet.has(entry.id));
+        const otherDetail = otherCandidates.map(entry => ({
+          id: entry.id,
+          label: clusterLabel(entry.id),
+          sum: entry.sum
+        }));
+        const otherSum = otherDetail.reduce((acc, item) => acc + item.sum, 0);
+        state.otherBreakdown = {
+          items: otherDetail,
+          sum: otherSum,
+          avgShare: state.dates.length ? otherSum / state.dates.length : 0,
+          coverage: 0
+        };
+        if (otherCandidates.length) {
+          const otherData = state.dates.map((date, index) => {
+            let value = 0;
+            otherCandidates.forEach(entry => {
+              const point = state.series[entry.id][index];
+              value += point ? point.y : 0;
+            });
+            return {x: date, y: value};
+          });
+          datasets.push({
+            label: 'Other clusters',
+            data: otherData,
+            fill: true,
+            borderWidth: 1,
+            tension: 0.2,
+            borderDash: [6, 4],
+            borderColor: 'rgba(148, 163, 184, 1)',
+            backgroundColor: 'rgba(148, 163, 184, 0.25)',
+            stack: 'shares'
+          });
+        }
+        const coverage = computeCoverage(topIds);
+        state.otherBreakdown.coverage = Math.max(0, 100 - coverage);
+        const months = state.dates.length;
+        const metaParts = [
+          formatMonth(state.dates[0]) + ' - ' + formatMonth(state.dates[months - 1]),
+          months + ' months',
+          'Top ' + topIds.length + ' clusters cover ' + coverage.toFixed(1) + '%'
+        ];
+        if (otherCandidates.length) {
+          metaParts.push(otherCandidates.length + ' clusters in Other');
+        }
+        return {datasets, meta: metaParts.join(' | ')};
+      }
+
+      function computeCoverage(topIds) {
+        if (!state.dates.length) return 0;
+        const totalMonths = state.dates.length;
+        let totalTopShare = 0;
+        state.dates.forEach((_, index) => {
+          let monthTop = 0;
+          topIds.forEach(id => {
+            const point = state.series[id][index];
+            monthTop += point ? point.y : 0;
+          });
+          totalTopShare += monthTop;
+        });
+        return (totalTopShare / totalMonths) * 100;
+      }
+
+      function showClusterDetail(id) {
+        const points = state.series[id];
+        if (!points || !points.length) return;
+        state.currentClusterId = id;
+        const info = state.clusterMap.get(Number(id));
+        const lastPoint = points[points.length - 1];
+        const prevPoint = points[points.length - 2];
+        const historyMap = new Map(points.map(pt => [keyForMonth(pt.x), pt.y]));
+        const previousYear = historyMap.get(keyForOffset(lastPoint.x, -12));
+        const recordCount = info && Number(info.count_of_records) ? Number(info.count_of_records) : 0;
+        renderKPIs({
+          share: lastPoint.y,
+          mom: changeRatio(prevPoint ? prevPoint.y : null, lastPoint.y),
+          yoy: changeRatio(previousYear, lastPoint.y),
+          records: recordCount,
+          month: formatMonth(lastPoint.x)
+        });
+        elements.clusterTitle.textContent = info ? info.label : 'Cluster ' + id;
+        elements.clusterSubtitle.textContent = 'Centroid ' + id + ' | ' + formatMonth(points[0].x) + ' - ' + formatMonth(lastPoint.x);
+        loadQuestions(id);
+      }
+
+      function renderKPIs(data) {
+        elements.kpiGrid.innerHTML = '';
+        elements.kpiGrid.append(
+          createKpi('Last month share (' + data.month + ')', formatPercent(data.share)),
+          createKpi('MoM change', formatDelta(data.mom)),
+          createKpi('YoY change', formatDelta(data.yoy)),
+          createKpi('Total records', formatNumber(data.records))
+        );
+      }
+
+      function createKpi(label, value) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'kpi';
+        const title = document.createElement('span');
+        title.textContent = label;
+        const strong = document.createElement('strong');
+        strong.textContent = value;
+        wrapper.append(title, strong);
+        return wrapper;
+      }
+
+      async function loadQuestions(id) {
+        elements.questionsList.innerHTML = '<p class="meta">Loading questions...</p>';
+        state.questionPage = 0;
+        try {
+          if (!state.questionsCache.has(id)) {
+            const rows = await fetchJSON('/questionsByCluster?centroid_id=' + id);
+            state.questionsCache.set(id, Array.isArray(rows) ? rows : []);
+          }
+          renderQuestionsPage(id);
+        } catch (err) {
+          console.error(err);
+          elements.questionsList.innerHTML = '<p class="meta">Failed to load questions.</p>';
+          elements.questionPager.hidden = true;
+        }
+      }
+
+      function renderQuestionsPage(id) {
+        const rows = state.questionsCache.get(id) || [];
+        elements.questionsList.innerHTML = '';
+        if (!rows.length) {
+          elements.questionsList.innerHTML = '<p class="meta">No questions for this cluster.</p>';
+          elements.questionPager.hidden = true;
+          return;
+        }
+        const start = state.questionPage * state.pageSize;
+        const pageRows = rows.slice(start, start + state.pageSize);
+        pageRows.forEach(item => {
+          const card = document.createElement('article');
+          card.className = 'question-card';
+          const summary = document.createElement('p');
+          summary.textContent = (item.question_summary || '').trim();
+          const link = document.createElement('a');
+          link.href = item.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'Open in new tab';
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = item.label ? item.label : 'Cluster ' + id;
+          card.append(summary, meta, link);
+          elements.questionsList.append(card);
+        });
+        elements.questionPager.hidden = rows.length <= state.pageSize;
+        elements.pageInfo.textContent = 'Page ' + (state.questionPage + 1) + ' of ' + Math.ceil(rows.length / state.pageSize);
+        elements.prevPage.disabled = state.questionPage === 0;
+        elements.nextPage.disabled = (state.questionPage + 1) * state.pageSize >= rows.length;
+      }
+
+
+      function renderOtherBreakdown() {
+        const data = state.otherBreakdown;
+        if (!elements.otherBreakdown) return;
+        if (!data.items.length) {
+          if (state.otherChart) {
+            state.otherChart.destroy();
+            state.otherChart = null;
+          }
+          const ctx = elements.otherChart.getContext('2d');
+          ctx.clearRect(0, 0, elements.otherChart.width, elements.otherChart.height);
+          elements.otherMeta.textContent = '0 clusters | Combined share ' + formatPercent(0);
+          elements.otherEmpty.hidden = false;
+          return;
+        }
+        elements.otherEmpty.hidden = true;
+        const labels = data.items.map(item => item.label);
+        const values = data.items.map(item => item.sum);
+        const colors = data.items.map(item => lineColor(item.id).stroke);
+        if (!state.otherChart) {
+          state.otherChart = new Chart(elements.otherChart.getContext('2d'), {
+            type: 'pie',
+            data: {
+              labels,
+              datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderColor: 'rgba(255, 255, 255, 0.85)',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {position: 'right'},
+                tooltip: {
+                  callbacks: {
+                    label: context => {
+                      const item = state.otherBreakdown.items[context.dataIndex];
+                      const share = state.otherBreakdown.sum ? item.sum / state.otherBreakdown.sum : 0;
+                      return item.label + ': ' + formatPercent(share);
+                    }
+                  }
+                }
+              }
+            }
+          });
+        } else {
+          state.otherChart.data.labels = labels;
+          state.otherChart.data.datasets[0].data = values;
+          state.otherChart.data.datasets[0].backgroundColor = colors;
+          state.otherChart.update();
+        }
+        const coverage = data.coverage || 0;
+        const coverageText = coverage ? ' | Combined share ' + coverage.toFixed(1) + '%' : '';
+        elements.otherMeta.textContent = data.items.length + ' clusters | Avg monthly share ' + formatPercent(data.avgShare) + coverageText;
+      }
+
+      function fetchJSON(path) {
+        return fetch(API_BASE + path).then(response => {
+          if (!response.ok) {
+            throw new Error('Request failed: ' + response.status);
+          }
+          return response.json();
+        });
+      }
+
+      function lineColor(id) {
+        const hue = (Number(id) * 47) % 360;
+        return {
+          stroke: 'hsl(' + hue + ', 70%, 45%)',
+          fill: 'hsla(' + hue + ', 75%, 55%, 0.25)'
+        };
+      }
+
+      function clusterLabel(id) {
+        const info = state.clusterMap.get(Number(id));
+        return info ? info.label : 'Cluster ' + id;
+      }
+
+      function formatPercent(value) {
+        if (!Number.isFinite(value)) return '0%';
+        return (value * 100).toFixed(1) + '%';
+      }
+
+      function formatDelta(value) {
+        if (value === null || value === undefined) return 'n/a';
+        if (!Number.isFinite(value)) return 'n/a';
+        const sign = value > 0 ? '+' : '';
+        return sign + value.toFixed(1) + '%';
+      }
+
+      function formatNumber(value) {
+        return Number(value || 0).toLocaleString();
+      }
+
+      function formatDistance(value) {
+        if (!Number.isFinite(value)) return 'n/a';
+        return value.toFixed(3);
+      }
+
+      function formatMonth(date) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months[date.getMonth()] + ' ' + date.getFullYear();
+      }
+
+      function keyForMonth(date) {
+        return date.getFullYear() + '-' + (date.getMonth() + 1);
+      }
+
+      function keyForOffset(date, months) {
+        const d = new Date(date.getTime());
+        d.setMonth(d.getMonth() + months);
+        return keyForMonth(d);
+      }
+
+      function changeRatio(previous, current) {
+        if (previous === null || previous === undefined) return null;
+        if (!Number.isFinite(previous) || previous === 0) return null;
+        return ((current - previous) / previous) * 100;
+      }
+
+      function escapeHtml(value) {
+        if (!value) return '';
+        return value.replace(/[&<>"']/g, c => {
+          const map = {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"};
+          return map[c];
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
